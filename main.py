@@ -3,7 +3,9 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from call_function import available_functions
+from call_function import available_functions, call_function
+
+
 
 def main():
     load_dotenv()
@@ -53,8 +55,18 @@ def main():
         return response.text
     if type(response.function_calls) == list:
         for l in response.function_calls:
-            print(f"Calling function: {l.name}({l.args})")
-            print(response.text)
+            if "--verbose" in args:
+                results = call_function(l, verbose = True)
+                if results.parts[0].function_response.response:
+                    print(f"-> {results.parts[0].function_response.response}")
+                else:
+                    raise Exception ("Error, function call did not return results")
+            else:
+                results = call_function(l)
+                if not results.parts[0].function_response.response:
+                    raise Exception("Error, function call did not return results")
+            
+
     
 
 if __name__ == "__main__":
