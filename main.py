@@ -38,12 +38,58 @@ def main():
         types.Content(role="user", parts=[types.Part(text=user_prompt)]),
     ]
 
-
-    response = client.models.generate_content(
-    model='gemini-2.0-flash-001', contents=messages,
-    config=types.GenerateContentConfig(tools=[available_functions],system_instruction=system_prompt)
-    )
-    
+    try:
+        for i in range(20):
+            response = client.models.generate_content(
+            model='gemini-2.0-flash-001', contents=messages,
+            config=types.GenerateContentConfig(tools=[available_functions],system_instruction=system_prompt)
+            )
+            for can in response.candidates:
+                messages.append(can.content)
+            
+            if response.function_calls:
+                 
+                if type(response.function_calls) == list:
+                    for l in response.function_calls:
+                        print(f"Calling function: {l.name}")
+                        if "--verbose" in args:
+                            results = call_function(l, verbose = True)
+                            message_to_add = types.Content(
+                                role="tool",
+                                parts=[
+                                    types.Part.from_function_response(name=l.name, response=results.parts[0].function_response.response)
+                                ],
+                            )
+                            messages.append(message_to_add)
+                            if results.parts[0].function_response.response:
+                                print(f"-> {results.parts[0].function_response.response}")
+                            else:
+                                raise Exception ("Error, function call did not return results")
+                        else:
+                            results = call_function(l)
+                            message_to_add = types.Content(
+                                role="tool",
+                                parts=[
+                                    types.Part.from_function_response(name=l.name, response=results.parts[0].function_response.response)
+                                ],
+                            )
+                            messages.append(message_to_add)
+                            if not results.parts[0].function_response.response:
+                                raise Exception("Error, function call did not return results")
+            
+            elif response.text:
+                print("Final response:")
+                print(response.text)
+                break
+            else:
+                break
+            i += 1
+                        
+        
+                    
+    except Exception as e:
+        print (f"Error: {str(e)}")
+        
     
 
     if "--verbose" in args:
@@ -51,20 +97,6 @@ def main():
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
-    if not response.function_calls:
-        return response.text
-    if type(response.function_calls) == list:
-        for l in response.function_calls:
-            if "--verbose" in args:
-                results = call_function(l, verbose = True)
-                if results.parts[0].function_response.response:
-                    print(f"-> {results.parts[0].function_response.response}")
-                else:
-                    raise Exception ("Error, function call did not return results")
-            else:
-                results = call_function(l)
-                if not results.parts[0].function_response.response:
-                    raise Exception("Error, function call did not return results")
             
 
     
